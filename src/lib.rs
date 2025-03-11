@@ -20,7 +20,7 @@
 //! # Example
 //! ```
 //! use tokio::time::Duration;
-//! 
+//!
 //! use orchestrator_lock::OrchestratorMutex;
 //!
 //! #[tokio::main(flavor = "current_thread")]
@@ -141,18 +141,13 @@ impl<T> OrchestratorMutex<T> {
     }
 
     /// Directly acquire the underlying lock.
-    pub async fn acquire(&mut self) -> tokio::sync::MutexGuard<'_, T> {
+    pub async fn acquire(&self) -> tokio::sync::MutexGuard<'_, T> {
         self.inner.lock().await
     }
 
-    /// Attempt to acquire the underlying lock.
-    ///
-    /// This is guaranteed to succeed
-    /// if every future returned by [grant_access](Self::grant_access) is
-    /// awaited to completion.
-    pub fn try_acquire(
-        &mut self,
-    ) -> Result<tokio::sync::MutexGuard<'_, T>, tokio::sync::TryLockError> {
+    /// Attempt to acquire the underlying lock, failing if the lock is already
+    /// held.
+    pub fn try_acquire(&self) -> Result<tokio::sync::MutexGuard<'_, T>, tokio::sync::TryLockError> {
         self.inner.try_lock()
     }
 
@@ -170,12 +165,13 @@ impl<T> OrchestratorMutex<T> {
     /// If the future in the [Ok] variant is dropped, the next call to
     /// [grant_access](Self::grant_access) will have to wait for the current
     /// [MutexGuard] to be dropped before it can grant access to the next
-    /// [MutexLocker].
+    /// [MutexLocker]. If this is called multiple times in parallel, the
+    /// order in which the [MutexLocker]s are granted access is unspecified.
     ///
     /// # Panics
     /// Panics if `granter` was created from a different [OrchestratorMutex].
     pub async fn grant_access(
-        &mut self,
+        &self,
         granter: &mut Granter<T>,
     ) -> Result<impl Future<Output = tokio::sync::MutexGuard<'_, T>>, error::GrantError> {
         assert!(

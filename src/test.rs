@@ -5,7 +5,7 @@ use crate::{MutexGuard, OrchestratorMutex, error};
 
 #[tokio::test]
 async fn test_basic_functionality() {
-    let mut orchestrator = OrchestratorMutex::new(42);
+    let orchestrator = OrchestratorMutex::new(42);
     let (mut granter, mut locker) = orchestrator.add_locker();
 
     // Grant access and start acquiring in separate task
@@ -33,7 +33,7 @@ async fn test_basic_functionality() {
 
 #[tokio::test]
 async fn test_multiple_lockers() {
-    let mut orchestrator = OrchestratorMutex::new(0);
+    let orchestrator = OrchestratorMutex::new(0);
     let (mut granter1, mut locker1) = orchestrator.add_locker();
     let (mut granter2, mut locker2) = orchestrator.add_locker();
 
@@ -74,7 +74,7 @@ async fn test_multiple_lockers() {
 
 #[tokio::test]
 async fn test_try_acquire() {
-    let mut orchestrator = OrchestratorMutex::new(42);
+    let orchestrator = OrchestratorMutex::new(42);
     let (mut granter, mut locker) = orchestrator.add_locker();
 
     // Initially try_acquire should fail with AccessDenied
@@ -105,7 +105,7 @@ async fn test_try_acquire() {
 
 #[tokio::test]
 async fn test_direct_acquisition() {
-    let mut orchestrator = OrchestratorMutex::new(42);
+    let orchestrator = OrchestratorMutex::new(42);
 
     // Direct acquire
     let mut guard = orchestrator.acquire().await;
@@ -166,7 +166,7 @@ async fn test_granter_dropped() {
 
 #[tokio::test]
 async fn test_mutex_guard_into_owned() {
-    let mut orchestrator = OrchestratorMutex::new(42);
+    let orchestrator = OrchestratorMutex::new(42);
     let (mut granter, mut locker) = orchestrator.add_locker();
 
     let grant_task = tokio::spawn(async move {
@@ -189,7 +189,7 @@ async fn test_mutex_guard_into_owned() {
 
 #[tokio::test]
 async fn test_grant_access_with_dropped_locker() {
-    let mut orchestrator = OrchestratorMutex::new(42);
+    let orchestrator = OrchestratorMutex::new(42);
     let (mut granter, locker) = orchestrator.add_locker();
 
     // Drop the locker
@@ -213,7 +213,7 @@ async fn test_concurrent_access_and_modifications() {
     const NUM_LOCKERS: usize = 5;
     const ITERATIONS_PER_LOCKER: usize = 10;
 
-    let mut orchestrator = OrchestratorMutex::new(0);
+    let orchestrator = OrchestratorMutex::new(0);
     let mut granters = Vec::with_capacity(NUM_LOCKERS);
     let mut locker_handles = Vec::with_capacity(NUM_LOCKERS);
 
