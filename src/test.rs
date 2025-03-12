@@ -24,8 +24,8 @@ async fn test_basic_functionality() {
     let grant_future = orchestrator.grant_access(&mut granter).await.unwrap();
 
     // Wait for locker to release the guard and get it back
-    let mut_guard = grant_future.await;
-    assert_eq!(*mut_guard, 84);
+    grant_future.await;
+    assert_eq!(*orchestrator.try_acquire().unwrap(), 84);
 
     // Cleanup
     acquire_task.await.unwrap();
@@ -55,17 +55,15 @@ async fn test_multiple_lockers() {
     let grant_future1 = orchestrator.grant_access(&mut granter1).await.unwrap();
 
     // Wait for first locker to finish and get the lock back
-    let mut_guard = grant_future1.await;
-    assert_eq!(*mut_guard, 1);
-    drop(mut_guard);
+    grant_future1.await;
+    assert_eq!(*orchestrator.try_acquire().unwrap(), 1);
 
     // Now grant access to second locker
     let grant_future2 = orchestrator.grant_access(&mut granter2).await.unwrap();
 
     // Wait for second locker to finish and get the lock back
-    let mut_guard = grant_future2.await;
-    assert_eq!(*mut_guard, 11); // 1 + 10
-    drop(mut_guard);
+    grant_future2.await;
+    assert_eq!(*orchestrator.try_acquire().unwrap(), 11); // 1 + 10
 
     // Cleanup
     task1.await.unwrap();
@@ -86,8 +84,8 @@ async fn test_try_acquire() {
     // Grant access in a separate task
     let grant_task = tokio::spawn(async move {
         let grant_future = orchestrator.grant_access(&mut granter).await.unwrap();
-        let mut_guard = grant_future.await;
-        assert_eq!(*mut_guard, 84); // Should be modified by the locker
+        grant_future.await;
+        assert_eq!(*orchestrator.try_acquire().unwrap(), 84); // Should be modified by the locker
     });
 
     // Wait for access to be granted
@@ -172,8 +170,8 @@ async fn test_mutex_guard_into_owned() {
     let grant_task = tokio::spawn(async move {
         let grant_future = orchestrator.grant_access(&mut granter).await.unwrap();
         sleep(Duration::from_millis(50)).await; // Give time for locker to process
-        let mut_guard = grant_future.await;
-        assert_eq!(*mut_guard, 84);
+        grant_future.await;
+        assert_eq!(*orchestrator.try_acquire().unwrap(), 84);
     });
 
     // Acquire the guard, convert to owned, and modify
@@ -256,17 +254,18 @@ async fn test_concurrent_access_and_modifications() {
     for iteration in 0..ITERATIONS_PER_LOCKER {
         for i in 0..NUM_LOCKERS {
             let grant_future = orchestrator.grant_access(&mut granters[i]).await.unwrap();
-            let guard = grant_future.await;
+            grant_future.await;
 
             // After each complete round, value should have increased by NUM_LOCKERS
             if i == NUM_LOCKERS - 1 && iteration < ITERATIONS_PER_LOCKER - 1 {
+                let val = *orchestrator.try_acquire().unwrap();
                 assert_eq!(
-                    *guard,
+                    val,
                     ((iteration + 1) * NUM_LOCKERS) as i32,
                     "After round {}, expected value {} but got {}",
                     iteration + 1,
                     ((iteration + 1) * NUM_LOCKERS),
-                    *guard
+                    val
                 );
             }
         }

@@ -59,20 +59,16 @@
 //!     });
 //!     
 //!     // Orchestration: Alternate between the two tasks
-//!     let expected = [1, 2, 3, 6, 7, 14];
 //!     for i in 0..3 {
 //!         // Grant access to task 1
-//!         let grant_future = orchestrator.grant_access(&mut granter1).await.unwrap();
-//!         let guard = grant_future.await;
-//!         assert_eq!(*guard, expected[i * 2]);
-//!         drop(guard);
+//!         let task1_holding = orchestrator.grant_access(&mut granter1).await.unwrap();
+//!         task1_holding.await;
 //!         
 //!         // Grant access to task 2
-//!         let grant_future = orchestrator.grant_access(&mut granter2).await.unwrap();
-//!         let guard = grant_future.await;
-//!         assert_eq!(*guard, expected[i * 2 + 1]);
-//!         drop(guard);
+//!         let task2_holding = orchestrator.grant_access(&mut granter2).await.unwrap();
+//!         task2_holding.await;
 //!     }
+//!     assert_eq!(*orchestrator.acquire().await, 14);
 //!     // Clean up
 //!     let _ = task1.await.unwrap();
 //!     let _ = task2.await.unwrap();
@@ -83,7 +79,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Weak};
 
 use tokio::select;
-use tokio::sync::{Mutex, OwnedMutexGuard};
+use tokio::sync::{Mutex, Notify};
 use tokio_util::sync::{CancellationToken, DropGuard};
 
 pub mod error {
@@ -106,6 +102,15 @@ pub struct OrchestratorMutex<T> {
     dropped: CancellationToken,
     _drop_guard: DropGuard,
 }
+
+pub struct OwnedMutexGuard<T> {
+    // Field ordering ensures that the inner guard is dropped before the
+    // finished notification is sent.
+    inner: tokio::sync::OwnedMutexGuard<T>,
+    _finished: Finished,
+}
+
+struct Finished(Arc<Notify>);
 
 pub struct Granter<T> {
     inner: Weak<Mutex<T>>,
@@ -158,9 +163,8 @@ impl<T> OrchestratorMutex<T> {
     /// called
     /// [acquire](MutexLocker::acquire) (or [Err] if the [MutexLocker] has been
     /// dropped).
-    /// The [Ok] variant contains a future which waits for the [MutexGuard] to
-    /// be dropped and then re-acquires the mutex so the caller can see what
-    /// changes were made.
+    /// The [Ok] variant contains a future which waits for the acquiring task to
+    /// drop its [MutexGuard].
     ///
     /// If the future in the [Ok] variant is dropped, the next call to
     /// [grant_access](Self::grant_access) will have to wait for the current
@@ -173,13 +177,19 @@ impl<T> OrchestratorMutex<T> {
     pub async fn grant_access(
         &self,
         granter: &mut Granter<T>,
-    ) -> Result<impl Future<Output = tokio::sync::MutexGuard<'_, T>>, error::GrantError> {
+    ) -> Result<impl Future<Output = ()>, error::GrantError> {
         assert!(
             Weak::ptr_eq(&granter.inner, &Arc::downgrade(&self.inner)),
             "Granter is not associated with this OrchestratorMutex"
         );
-        match granter.tx.send(self.inner.clone().lock_owned().await).await {
-            Ok(()) => Ok(self.inner.lock()),
+        let inner_guard = self.inner.clone().lock_owned().await;
+        let finished = Arc::new(Notify::new());
+        let guard = OwnedMutexGuard {
+            inner: inner_guard,
+            _finished: Finished(Arc::clone(&finished)),
+        };
+        match granter.tx.send(guard).await {
+            Ok(()) => Ok(async move { finished.notified().await }),
             Err(relay_channel::error::SendError(_)) => Err(error::GrantError),
         }
     }
@@ -216,6 +226,26 @@ impl<T> MutexLocker<T> {
                 Err(error::TryAcquireError::Inaccessible)
             }
         }
+    }
+}
+
+impl<T> Deref for OwnedMutexGuard<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.inner
+    }
+}
+
+impl<T> DerefMut for OwnedMutexGuard<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut *self.inner
+    }
+}
+
+impl Drop for Finished {
+    fn drop(&mut self) {
+        self.0.notify_one();
     }
 }
 
