@@ -150,6 +150,10 @@ impl<T> OrchestratorMutex<T> {
         self.inner.lock().await
     }
 
+    pub fn blocking_acquire(&self) -> tokio::sync::MutexGuard<'_, T> {
+        self.inner.blocking_lock()
+    }
+
     /// Attempt to acquire the underlying lock, failing if the lock is already
     /// held.
     pub fn try_acquire(&self) -> Result<tokio::sync::MutexGuard<'_, T>, tokio::sync::TryLockError> {
