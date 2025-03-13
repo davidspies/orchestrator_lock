@@ -1,5 +1,7 @@
-use std::time::Duration;
-use tokio::time::{sleep, timeout};
+use std::{task::Poll, time::Duration};
+
+use futures::poll;
+use tokio::{pin, time::sleep};
 
 use crate::{MutexGuard, OrchestratorMutex, error};
 
@@ -16,9 +18,6 @@ async fn test_basic_functionality() {
         drop(guard);
         locker
     });
-
-    // Give the task time to start
-    sleep(Duration::from_millis(10)).await;
 
     // Grant access
     let grant_future = orchestrator.grant_access(&mut granter).await.unwrap();
@@ -131,9 +130,16 @@ async fn test_orchestrator_dropped() {
     drop(orchestrator);
 
     // Locker should now fail to acquire
-    let result = timeout(Duration::from_millis(100), locker.acquire()).await;
-    assert!(result.is_ok(), "acquire didn't complete");
-    assert!(result.unwrap().is_none(), "acquire didn't return None");
+    {
+        let acquire_fut = locker.acquire();
+        pin!(acquire_fut);
+        match poll!(acquire_fut) {
+            Poll::Pending => panic!("acquire didn't complete"),
+            Poll::Ready(opt_guard) => {
+                assert!(opt_guard.is_none(), "acquire didn't return None")
+            }
+        }
+    }
 
     // try_acquire should also fail
     match locker.try_acquire() {
@@ -151,9 +157,16 @@ async fn test_granter_dropped() {
     drop(granter);
 
     // Locker should now fail to acquire
-    let result = timeout(Duration::from_millis(100), locker.acquire()).await;
-    assert!(result.is_ok(), "acquire didn't complete");
-    assert!(result.unwrap().is_none(), "acquire didn't return None");
+    {
+        let acquire_fut = locker.acquire();
+        pin!(acquire_fut);
+        match poll!(acquire_fut) {
+            Poll::Pending => panic!("acquire didn't complete"),
+            Poll::Ready(opt_guard) => {
+                assert!(opt_guard.is_none(), "acquire didn't return None")
+            }
+        }
+    }
 
     // try_acquire should also fail
     match locker.try_acquire() {
@@ -169,7 +182,6 @@ async fn test_mutex_guard_into_owned() {
 
     let grant_task = tokio::spawn(async move {
         let grant_future = orchestrator.grant_access(&mut granter).await.unwrap();
-        sleep(Duration::from_millis(50)).await; // Give time for locker to process
         grant_future.await;
         assert_eq!(*orchestrator.try_acquire().unwrap(), 84);
     });
