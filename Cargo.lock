@@ -24,6 +24,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
+name = "awaitable-bool"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "112febd70d93910306564f86a14d54fc2575ff1194c1cbaf286f344f695e28b3"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -39,12 +48,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bytes"
-version = "1.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
-
-[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -55,6 +58,17 @@ name = "consume_on_drop"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47d91586aac6b9f9e32032b8ebf58a8eb03f4b58d3e18ea493b8b2083cb7b88e"
+
+[[package]]
+name = "derive-where"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e73f2692d4bd3cac41dca28934a39894200c9fabf49586d77d0e5954af1d7902"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "futures"
@@ -185,10 +199,10 @@ dependencies = [
 name = "orchestrator_lock"
 version = "0.2.1"
 dependencies = [
+ "awaitable-bool",
  "futures",
  "relay_channel",
  "tokio",
- "tokio-util",
 ]
 
 [[package]]
@@ -224,12 +238,13 @@ dependencies = [
 [[package]]
 name = "relay_channel"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e263171352d28b9e02208adc33e8de56194c04443ceb441768020813d2ad9ae6"
+source = "git+https://github.com/davidspies/relay_channel?branch=poll-send#5051a2f3bf9d7f49a60894a114c2e357e66cb6d4"
 dependencies = [
+ "awaitable-bool",
  "consume_on_drop",
+ "derive-where",
+ "sync_wrapper",
  "tokio",
- "tokio-util",
 ]
 
 [[package]]
@@ -259,6 +274,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync_wrapper"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bf256ce5efdfa370213c1dabab5935a12e49f2c58d15e9eac2870d3b4f27263"
+
+[[package]]
 name = "tokio"
 version = "1.43.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -278,19 +299,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "tokio-util"
-version = "0.7.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7fcaa8d55a2bdd6b83ace262b016eca0d79ee02818c5c1bcdf0305114081078"
-dependencies = [
- "bytes",
- "futures-core",
- "futures-sink",
- "pin-project-lite",
- "tokio",
 ]
 
 [[package]]

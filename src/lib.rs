@@ -78,9 +78,9 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Weak};
 
+use awaitable_bool::AwaitableBool;
 use tokio::select;
 use tokio::sync::{Mutex, Notify};
-use tokio_util::sync::{CancellationToken, DropGuard};
 
 pub mod error {
     #[derive(Debug, PartialEq, Eq)]
@@ -99,8 +99,13 @@ pub mod error {
 
 pub struct OrchestratorMutex<T> {
     inner: Arc<Mutex<T>>,
-    dropped: CancellationToken,
-    _drop_guard: DropGuard,
+    dropped: Arc<AwaitableBool>,
+}
+
+impl<T> Drop for OrchestratorMutex<T> {
+    fn drop(&mut self) {
+        self.dropped.set_true();
+    }
 }
 
 pub struct OwnedMutexGuard<T> {
@@ -118,7 +123,7 @@ pub struct Granter<T> {
 }
 
 pub struct MutexLocker<T> {
-    mutex_dropped: CancellationToken,
+    mutex_dropped: Arc<AwaitableBool>,
     rx: relay_channel::Receiver<OwnedMutexGuard<T>>,
 }
 
@@ -129,12 +134,10 @@ pub struct MutexGuard<'a, T> {
 
 impl<T> OrchestratorMutex<T> {
     pub fn new(value: T) -> Self {
-        let dropped = CancellationToken::new();
-        let drop_guard = dropped.clone().drop_guard();
+        let dropped = Arc::new(AwaitableBool::new(false));
         Self {
             inner: Arc::new(Mutex::new(value)),
             dropped,
-            _drop_guard: drop_guard,
         }
     }
 
@@ -205,7 +208,7 @@ impl<T> MutexLocker<T> {
     pub async fn acquire(&mut self) -> Option<MutexGuard<'_, T>> {
         let result = select! {
             result = self.rx.recv() => result,
-            () = self.mutex_dropped.cancelled() => None,
+            () = self.mutex_dropped.wait_true() => None,
         };
         Some(MutexGuard {
             guard: result?,
@@ -220,7 +223,7 @@ impl<T> MutexLocker<T> {
                 _locker: self,
             }),
             Err(relay_channel::error::TryRecvError::Empty) => {
-                if self.mutex_dropped.is_cancelled() {
+                if self.mutex_dropped.is_true() {
                     Err(error::TryAcquireError::Inaccessible)
                 } else {
                     Err(error::TryAcquireError::AccessDenied)

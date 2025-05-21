@@ -7,9 +7,9 @@ description = "A Mutex whose access order is managed by a separate thread"
 repository = "https://github.com/davidspies/orchestrator_lock"
 
 [dependencies]
-relay_channel = "0.1.1"
+awaitable-bool = "0.1.4"
+relay_channel = { git = "https://github.com/davidspies/relay_channel", branch = "poll-send" }
 tokio = { version = "1.43.0", features = ["macros", "sync"] }
-tokio-util = "0.7.13"
 
 [dev-dependencies]
 futures = "0.3.31"
