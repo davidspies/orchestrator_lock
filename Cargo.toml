@@ -1,15 +1,15 @@
 [package]
 name = "orchestrator_lock"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 license = "MIT"
 description = "A Mutex whose access order is managed by a separate thread"
 repository = "https://github.com/davidspies/orchestrator_lock"
 
 [dependencies]
-relay_channel = "0.1.1"
+awaitable-bool = "0.1.4"
+relay_channel = "0.1.2"
 tokio = { version = "1.43.0", features = ["macros", "sync"] }
-tokio-util = "0.7.13"
 
 [dev-dependencies]
 futures = "0.3.31"
