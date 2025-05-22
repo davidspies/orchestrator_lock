@@ -240,13 +240,13 @@ impl<T> Deref for OwnedMutexGuard<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &*self.inner
+        &self.inner
     }
 }
 
 impl<T> DerefMut for OwnedMutexGuard<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.inner
+        &mut self.inner
     }
 }
 
@@ -272,13 +272,13 @@ impl<T> Deref for MutexGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &*self.guard
+        &self.guard
     }
 }
 
 impl<T> DerefMut for MutexGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.guard
+        &mut self.guard
     }
 }
 
