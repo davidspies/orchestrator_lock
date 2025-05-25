@@ -80,7 +80,7 @@ use std::sync::{Arc, Weak};
 
 use awaitable_bool::AwaitableBool;
 use tokio::select;
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::Mutex;
 
 pub mod error {
     #[derive(Debug, PartialEq, Eq)]
@@ -115,7 +115,7 @@ pub struct OwnedMutexGuard<T> {
     _finished: Finished,
 }
 
-struct Finished(Arc<Notify>);
+struct Finished(Arc<AwaitableBool>);
 
 pub struct Granter<T> {
     inner: Weak<Mutex<T>>,
@@ -190,13 +190,13 @@ impl<T> OrchestratorMutex<T> {
             "Granter is not associated with this OrchestratorMutex"
         );
         let inner_guard = self.inner.clone().lock_owned().await;
-        let finished = Arc::new(Notify::new());
+        let finished = Arc::new(AwaitableBool::new(false));
         let guard = OwnedMutexGuard {
             inner: inner_guard,
             _finished: Finished(Arc::clone(&finished)),
         };
         match granter.tx.send(guard).await {
-            Ok(()) => Ok(async move { finished.notified().await }),
+            Ok(()) => Ok(async move { finished.wait_true().await }),
             Err(relay_channel::error::SendError(_)) => Err(error::GrantError),
         }
     }
@@ -252,7 +252,7 @@ impl<T> DerefMut for OwnedMutexGuard<T> {
 
 impl Drop for Finished {
     fn drop(&mut self) {
-        self.0.notify_one();
+        self.0.set_true();
     }
 }
 
